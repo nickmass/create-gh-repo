@@ -6,8 +6,11 @@ extern crate tempfile;
 extern crate hyper;
 extern crate git2;
 extern crate url;
+#[macro_use]
+extern crate clap;
 
-use git2::Repository;
+mod cli;
+use cli as Cli;
 use std::env;
 use std::process::Command;
 use std::io::{Write, Read, Seek, SeekFrom};
@@ -19,6 +22,7 @@ use hyper::client::{Client, RedirectPolicy};
 use hyper::header::{Connection, Authorization, Basic, UserAgent};
 use hyper::status::StatusCode;
 use url::Url;
+use git2::Repository;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct CreateRequest {
@@ -57,18 +61,29 @@ struct CreateResponse {
 }
 
 fn main() {
-    let editor = env::var("EDITOR").unwrap_or("nano".into());
-    let username = env::var("GITHUB_USERNAME").expect("Your Github UserName must be set in $GITHUB_USERNAME");
-    let token = env::var("GITHUB_TOKEN").expect("A GitHub Personal access token must be provided in $GITHUB_TOKEN");
+    let editor = env::var("EDITOR").unwrap_or("".into());
+    let username = env::var("GITHUB_USERNAME").unwrap_or("".into());
+    let token  = env::var("GITHUB_TOKEN").unwrap_or("".into());
+    let password = env::var("GITHUB_PASSWORD").unwrap_or("".into());
+  
+    let matches = Cli::build_cli(&editor, &username, &password, &token).get_matches();
+
+    let username = matches.value_of("username").unwrap();
+    let token = matches.value_of("auth").unwrap();
+    let editor = matches.value_of("editor").unwrap();
 
     let mut tmp_file = NamedTempFile::new().expect("Error creating temporary file");
     let _ = write!(tmp_file, "{}", template_text());
     let _ = tmp_file.sync_all();
     let path = tmp_file.path().to_str().unwrap();
-    let _ = Command::new(editor)
-                            .arg(path)
-                            .status()
-                            .expect("Failed to open temporary file");
+    match Command::new(editor)
+                    .arg(path)
+                    .status() {
+        Ok(status) if !status.success() => { return; }
+        Err(e) => { panic!("{}", e); }
+        _ => {}
+
+    }
 
     let mut tmp_file = tmp_file.reopen().unwrap();
     let _ = tmp_file.seek(SeekFrom::Start(0));
@@ -89,12 +104,12 @@ fn main() {
         },
         _ => Client::new()
     };
-
+    
     client.set_redirect_policy(RedirectPolicy::FollowAll);
     let mut res = client
         .post(&*api_url)
         .header(Connection::close())
-        .header(Authorization(Basic { username: username, password: Some(token) }))
+        .header(Authorization(Basic { username: username.to_string(), password: Some(token.to_string()) }))
         .header(UserAgent("create-gh-repo".into()))
         .body(json::to_string(&json).unwrap().as_bytes())
         .send().unwrap();
@@ -103,6 +118,7 @@ fn main() {
     let mut res_body = String::new();
     let _ = res.read_to_string(&mut res_body);
     println!("{}", res.status);
+    println!("{}", res_body);
     if res.status == StatusCode::Created {
         let res: CreateResponse = json::from_str(&*res_body).unwrap();
         println!("{}", "Repository Created:");
