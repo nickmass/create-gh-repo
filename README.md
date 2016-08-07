@@ -1,5 +1,5 @@
 # Create GitHub Repositories
-[![License](https://img.shields.io/github/license/nickmass/create-gh-repo.svg)(https://raw.githubusercontent.com/nickmass/create-gh-repo/master/LICENSE)] [![Build status](https://img.shields.io/travis/nickmass/create-gh-repo/master.svg)](https://travis-ci.org/nickmass/create-gh-repo) [![Build status](https://img.shields.io/appveyor/ci/nickmass/create-gh-repo/master.svg)](https://ci.appveyor.com/project/nickmass/create-gh-repo)
+[![License](https://img.shields.io/github/license/nickmass/create-gh-repo.svg)](https://raw.githubusercontent.com/nickmass/create-gh-repo/master/LICENSE) [![Build status](https://img.shields.io/travis/nickmass/create-gh-repo/master.svg)](https://travis-ci.org/nickmass/create-gh-repo) [![Build status](https://img.shields.io/appveyor/ci/nickmass/create-gh-repo/master.svg)](https://ci.appveyor.com/project/nickmass/create-gh-repo)
 
 Create new Github repositories from the command line
 
