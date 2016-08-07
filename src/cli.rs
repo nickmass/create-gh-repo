@@ -38,7 +38,7 @@ pub fn build_cli<'a>() -> App<'a,'a> {
              .index(2))
         .arg(Arg::with_name("mode")
              .index(1)
-             .possible_values(&["create", "clone", "remote", "push", "rebase"])
+             .possible_values(&["create", "clone", "remote", "push"])
              .default_value("clone")
              .required(true))
         .after_help("NOTES:{n}<username>, <token>, and <password> may alternatively be supplied by setting the GITHUB_USERNAME, GITHUB_TOKEN, or GITHUB_PASSWORD environment variables")

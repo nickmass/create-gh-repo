@@ -1,0 +1,41 @@
+platform: x64
+install:
+    - ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-nightly-x86_64-pc-windows-gnu.msi"
+    - msiexec /a rust-nightly-x86_64-pc-windows-gnu.msi TARGETDIR="C:\Rust" /norestart /qb
+    - choco install msys2 > nul
+    - RefreshEnv
+    - SET PATH=%PATH%;C:\Rust\Rust\bin
+    - SET MSYS2_ROOT=C:\tools\msys64
+    - msystem.bat MSYS
+    - pacman --noconfirm -S mingw-w64-x86_64-gcc
+    - pacman --noconfirm -S mingw-w64-x86_64-toolchain
+    - msystem.bat /D
+    - msystem.bat MINGW64
+    - copy C:\Tools\msys64\mingw64\bin\mingw32-make.exe C:\Tools\msys64\mingw64\bin\make.exe
+    - rustc -V
+    - cargo -V
+build_script:
+    - cargo build --verbose
+test_script:
+    - cargo test --verbose
+    - cargo run -- --help
+after_build:
+    - IF %APPVEYOR_REPO_TAG% EQU true cargo build --release
+    - IF %APPVEYOR_REPO_TAG% EQU true dir target\release
+    - IF %APPVEYOR_REPO_TAG% EQU true 7z a create-gh-repo-win-%APPVEYOR_REPO_TAG_NAME%.zip %APPVEYOR_BUILD_FOLDER%\target\release\create_gh_repo.exe
+artifacts:
+    - path: create-gh-repo-win-*.zip
+      name: release
+deploy:
+    release: $(appveyor_repo_tag_name)
+    description: "Release $(appveyor_repo_tag_name)"
+    provider: GitHub
+    auth_token:
+        secure: RT2z44BsBy0A/5TLqTBV9bUKamA8My702nhJOGpHy7zup9nOSCCWzI1+PZzr2Wqh
+    artifact: release
+    force_update: true
+    on:
+        branch: master
+        appveyor_repo_tag: true
+
+
