@@ -12,7 +12,6 @@ extern crate clap;
 extern crate log;
 extern crate env_logger;
 extern crate notify;
-extern crate fs2;
 
 mod cli;
 mod error;
@@ -26,12 +25,12 @@ use std::thread;
 use std::sync::mpsc::{channel, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::process::Command;
-use std::io::{Write, Read, Seek, SeekFrom};
+use std::io::{Write, Read};
+use std::fs::{remove_file, File};
 
 use tempfile::NamedTempFile;
 use serde_json as json;
 use notify::{Watcher, RecommendedWatcher};
-use fs2::FileExt;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct CreateRequest {
@@ -129,11 +128,12 @@ fn error<E>(err: E) -> E
 
 fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<CreateRequest>> {
     let mut tmp_file = try!(NamedTempFile::new());
-    try!(tmp_file.try_lock_shared());
     let _ = write!(tmp_file, "{}", template_text(options));
     let _ = tmp_file.sync_all();
-    let path = try!(tmp_file.path().to_str().ok_or(Error::InvalidTargetDir));
-
+    let path = try!(tmp_file.path().to_str().ok_or(Error::InvalidTargetDir)).to_string();
+    {
+        let _ = try!(tmp_file.persist(&path));
+    }
     let (tx, rx) = channel();
     let closed = Arc::new(Mutex::new(false));
     let written = Arc::new(Mutex::new(false));
@@ -142,7 +142,7 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
     {
         let closed = closed.clone();
         let written = written.clone();
-        let path = path.to_string();
+        let path = path.clone();
         thread::spawn(move || -> Result<()> {
             try!(watcher.watch(path));
             loop {
@@ -163,7 +163,7 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
         });
     }
     
-    let status = try!(Command::new(editor).arg(path).status());
+    let status = try!(Command::new(editor).arg(&path).status());
     {
         let mut closed = closed.lock().unwrap();
         *closed = true;
@@ -171,11 +171,10 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
 
     let written = written.lock().unwrap();
     if !status.success() || !*written { return Ok(None); }
-    let mut tmp_file = try!(tmp_file.reopen());
-    try!(tmp_file.try_lock_shared());
-    let _ = tmp_file.seek(SeekFrom::Start(0));
+    let mut tmp_file = try!(File::open(&path));
     let mut text = String::new();
     let _ = tmp_file.read_to_string(&mut text);
+    try!(remove_file(&path));
     Ok(Some(try!(json::from_str(&*text))))
 }
 

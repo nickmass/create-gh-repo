@@ -5,6 +5,7 @@ use hyper;
 use url;
 use git2;
 use notify;
+use tempfile;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -17,6 +18,7 @@ pub enum Error {
     Git(git2::Error),
     Deserialize(serde::de::value::Error),
     Notify(notify::Error),
+    Tempfile(tempfile::PersistError),
     MissingParameter(String),
     InvalidTargetDir,
     RepositoryBare,
@@ -32,6 +34,7 @@ impl std::fmt::Display for Error {
             Error::Url(ref e) => e.fmt(f),
             Error::Git(ref e) => e.fmt(f),
             Error::Notify(ref e) => e.fmt(f),
+            Error::Tempfile(ref e) => e.fmt(f),
             Error::MissingParameter(ref p) => write!(f, "Missing parameter: {}", p),
             Error::InvalidTargetDir => write!(f, "Target directory is invalid"),
             Error::RepositoryBare => write!(f, "Git repository is bare"),
@@ -49,6 +52,7 @@ impl std::error::Error for Error {
             Error::Url(ref e) => e.description(),
             Error::Git(ref e) => e.description(),
             Error::Notify(ref e) => e.description(),
+            Error::Tempfile(ref e) => e.description(),
             Error::MissingParameter(_) => "Missing parameter",
             Error::InvalidTargetDir => "Target directory is invalid",
             Error::RepositoryBare => "Git repository is bare",
@@ -64,6 +68,7 @@ impl std::error::Error for Error {
             Error::Url(ref e) => Some(e),
             Error::Git(ref e) => Some(e),
             Error::Notify(ref e) => Some(e),
+            Error::Tempfile(ref e) => Some(e),
             _ => None,
         }
     }
@@ -105,4 +110,9 @@ impl From<notify::Error> for Error {
     }
 }
 
+impl From<tempfile::PersistError> for Error {
+    fn from(e: tempfile::PersistError) -> Self {
+        Error::Tempfile(e)
+    }
+}
 

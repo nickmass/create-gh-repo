@@ -107,7 +107,7 @@ pub fn push(target_dir: Option<&str>, username: Option<&str>, password: Option<&
         cbs.credentials(|_, _, _| { //url, username from url, allowed cred types
             let username = if username.is_none() {
                 let mut buf = String::new();
-                stdin().read_line(&mut buf);
+                let _ = stdin().read_line(&mut buf);
                 buf
             } else {
                 username.unwrap().clone().to_string()
