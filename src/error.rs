@@ -19,7 +19,7 @@ pub enum Error {
     Notify(notify::Error),
     MissingParameter(String),
     InvalidTargetDir,
-
+    RepositoryBare,
 }
 
 impl std::fmt::Display for Error {
@@ -34,6 +34,7 @@ impl std::fmt::Display for Error {
             Error::Notify(ref e) => e.fmt(f),
             Error::MissingParameter(ref p) => write!(f, "Missing parameter: {}", p),
             Error::InvalidTargetDir => write!(f, "Target directory is invalid"),
+            Error::RepositoryBare => write!(f, "Git repository is bare"),
         }
     }
 }
@@ -50,6 +51,7 @@ impl std::error::Error for Error {
             Error::Notify(ref e) => e.description(),
             Error::MissingParameter(_) => "Missing parameter",
             Error::InvalidTargetDir => "Target directory is invalid",
+            Error::RepositoryBare => "Git repository is bare",
         }
     }
 

@@ -38,7 +38,7 @@ pub fn build_cli<'a>() -> App<'a,'a> {
              .index(2))
         .arg(Arg::with_name("mode")
              .index(1)
-             .possible_values(&["create", "clone", "remotes", "push", "rebase"])
+             .possible_values(&["create", "clone", "remote", "push", "rebase"])
              .default_value("clone")
              .required(true))
         .after_help("NOTES:{n}<username>, <token>, and <password> may alternatively be supplied by setting the GITHUB_USERNAME, GITHUB_TOKEN, or GITHUB_PASSWORD environment variables")
@@ -47,6 +47,8 @@ pub fn build_cli<'a>() -> App<'a,'a> {
 pub struct CommandOptions {
     pub editor: String,
     pub auth: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
     pub mode: GitMode,
     pub directory: Option<String>,
 }
@@ -120,7 +122,7 @@ impl CommandOptionsBuilder {
         let auth = if self.token_auth {
             self.token
         } else if !self.token_auth && self.password.is_some() && self.username.is_some() {
-            Some(format!("{}:{}", self.username.unwrap(), self.password.unwrap()))
+            Some(format!("{}:{}", self.username.as_ref().unwrap(), self.password.as_ref().unwrap()))
         } else {
             None
         };
@@ -132,6 +134,8 @@ impl CommandOptionsBuilder {
         Ok(CommandOptions {
             editor: editor,
             auth: auth,
+            username: self.username,
+            password: self.password,
             directory: self.directory,
             mode: mode,
         })
@@ -144,7 +148,7 @@ pub fn get_options() -> Result<CommandOptions> {
     let mode = match matches.value_of("mode") {
         Some("create") => GitMode::Create,
         Some("clone") => GitMode::Clone,
-        Some("remotes") => GitMode::Remotes,
+        Some("remote") => GitMode::Remote,
         Some("push") => GitMode::Push,
         Some("rebase") => GitMode::Rebase,
         _ => GitMode::Clone,

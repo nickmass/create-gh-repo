@@ -71,8 +71,17 @@ fn main() {
     env_logger::init().map_err(error).unwrap();
 
     let options = cli::get_options().map_err(error).unwrap();
-    let request_params = prompt_create_params(&options.editor).map_err(error).unwrap();
-    
+    let dir = options.directory.as_ref().map(|x| &**x);
+    let user = options.username.as_ref().map(|x| &**x);
+    let pass = options.password.as_ref().map(|x| &**x);
+
+    let default_params = CreateRequest {
+        name: git::get_repo_name(dir).unwrap_or("".into()),
+        auto_init: options.mode != GitMode::Push,
+        ..Default::default()
+    };
+    let request_params = prompt_create_params(&options.editor, &default_params).map_err(error).unwrap();
+ 
     if request_params.is_none() {
         println!("Request parameters not saved, repository not created.");
         return;
@@ -80,21 +89,29 @@ fn main() {
 
     let request_params = request_params.unwrap();
 
+    //TODO: Need to handle errors from Github api
     let api_url = "https://api.github.com/user/repos";
     let mut client = HttpClient::new();
     client.with_basic_authorization(options.auth, "");
     let res: CreateResponse = client.post_object(api_url, &request_params).map_err(error).unwrap();
-    
-    let dir = options.directory.as_ref().map(|x| &**x);
+ 
     println!("Repository Created: {}", res.clone_url);
     match options.mode {
         GitMode::Create => {},
         GitMode::Clone => {
-            let clone_dir = git::clone(&res.clone_url, dir).map_err(error).unwrap();
-            println!("Cloned into: {}", clone_dir);
+            let repo_dir = git::clone(&res.clone_url, dir).map_err(error).unwrap();
+            println!("Cloned into: {}", repo_dir);
         },
-        GitMode::Remotes => {unimplemented!();},
-        GitMode::Push => {unimplemented!();},
+        GitMode::Remote => { 
+            let repo_dir = git::remotes(&res.clone_url, dir).map_err(error).unwrap();
+            println!("Updated remotes for: {}", repo_dir);
+        },
+        GitMode::Push => { 
+            let repo_dir = git::remotes(&res.clone_url, dir).map_err(error).unwrap();
+            println!("Updated remotes for: {}", repo_dir);
+            let repo_dir = git::push(dir, user, pass).map_err(error).unwrap();
+            println!("Pushed repository: {}", repo_dir);
+        },
         GitMode::Rebase => {unimplemented!();},
     }
 }
@@ -108,9 +125,9 @@ fn error<E>(err: E) -> E
     err
 }
 
-fn prompt_create_params(editor: &str) -> Result<Option<CreateRequest>> {
+fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<CreateRequest>> {
     let mut tmp_file = try!(NamedTempFile::new());
-    let _ = write!(tmp_file, "{}", template_text());
+    let _ = write!(tmp_file, "{}", template_text(options));
     let _ = tmp_file.sync_all();
     let path = try!(tmp_file.path().to_str().ok_or(Error::InvalidTargetDir));
 
@@ -158,7 +175,7 @@ fn prompt_create_params(editor: &str) -> Result<Option<CreateRequest>> {
     Ok(Some(try!(json::from_str(&*text))))
 }
 
-fn template_text() -> String {
-    let json = json::to_string_pretty(&CreateRequest::default()).unwrap();
+fn template_text(req: &CreateRequest) -> String {
+    let json = json::to_string_pretty(req).unwrap();
     json
 }
