@@ -1,6 +1,6 @@
 #![feature(custom_derive, plugin)]
 #![plugin(serde_macros)]
-
+extern crate serde;
 extern crate serde_json;
 extern crate tempfile;
 extern crate hyper;
@@ -8,21 +8,28 @@ extern crate git2;
 extern crate url;
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+extern crate notify;
 
 mod cli;
-use cli as Cli;
-use std::env;
+mod error;
+use error::{Error, Result};
+mod http;
+use http::HttpClient;
+mod git;
+use git::GitMode;
+
+use std::thread;
+use std::sync::mpsc::{channel, TryRecvError};
+use std::sync::{Arc, Mutex};
 use std::process::Command;
 use std::io::{Write, Read, Seek, SeekFrom};
-use std::path::Path;
 
 use tempfile::NamedTempFile;
 use serde_json as json;
-use hyper::client::{Client, RedirectPolicy};
-use hyper::header::{Connection, Authorization, Basic, UserAgent};
-use hyper::status::StatusCode;
-use url::Url;
-use git2::Repository;
+use notify::{Watcher, RecommendedWatcher};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct CreateRequest {
@@ -41,7 +48,7 @@ struct CreateRequest {
 impl Default for CreateRequest {
     fn default() -> CreateRequest {
        CreateRequest {
-            name: "repo-name".into(),
+            name: "".into(),
             description: "".into(),
             homepage: "".into(),
             private: false,
@@ -61,102 +68,94 @@ struct CreateResponse {
 }
 
 fn main() {
-    let editor = env::var("EDITOR").unwrap_or("".into());
-    let username = env::var("GITHUB_USERNAME").unwrap_or("".into());
-    let token  = env::var("GITHUB_TOKEN").unwrap_or("".into());
-    let password = env::var("GITHUB_PASSWORD").unwrap_or("".into());
-  
-    let matches = Cli::build_cli(&editor, &username, &password, &token).get_matches();
+    env_logger::init().map_err(error).unwrap();
 
-    let username = matches.value_of("username").unwrap();
-    let token = matches.value_of("auth").unwrap();
-    let editor = matches.value_of("editor").unwrap();
-
-    let mut tmp_file = NamedTempFile::new().expect("Error creating temporary file");
-    let _ = write!(tmp_file, "{}", template_text());
-    let _ = tmp_file.sync_all();
-    let path = tmp_file.path().to_str().unwrap();
-    match Command::new(editor)
-                    .arg(path)
-                    .status() {
-        Ok(status) if !status.success() => { return; }
-        Err(e) => { panic!("{}", e); }
-        _ => {}
-
+    let options = cli::get_options().map_err(error).unwrap();
+    let request_params = prompt_create_params(&options.editor).map_err(error).unwrap();
+    
+    if request_params.is_none() {
+        println!("Request parameters not saved, repository not created.");
+        return;
     }
 
-    let mut tmp_file = tmp_file.reopen().unwrap();
+    let request_params = request_params.unwrap();
+
+    let api_url = "https://api.github.com/user/repos";
+    let mut client = HttpClient::new();
+    client.with_basic_authorization(options.auth, "");
+    let res: CreateResponse = client.post_object(api_url, &request_params).map_err(error).unwrap();
+    
+    let dir = options.directory.as_ref().map(|x| &**x);
+    println!("Repository Created: {}", res.clone_url);
+    match options.mode {
+        GitMode::Create => {},
+        GitMode::Clone => {
+            let clone_dir = git::clone(&res.clone_url, dir).map_err(error).unwrap();
+            println!("Cloned into: {}", clone_dir);
+        },
+        GitMode::Remotes => {unimplemented!();},
+        GitMode::Push => {unimplemented!();},
+        GitMode::Rebase => {unimplemented!();},
+    }
+}
+
+#[allow(unreachable_code)]
+fn error<E>(err: E) -> E 
+    where E: std::error::Error {
+    error!("Error: {:?}", err);
+    println!("Error: {}", err.description());
+    std::process::exit(1);
+    err
+}
+
+fn prompt_create_params(editor: &str) -> Result<Option<CreateRequest>> {
+    let mut tmp_file = try!(NamedTempFile::new());
+    let _ = write!(tmp_file, "{}", template_text());
+    let _ = tmp_file.sync_all();
+    let path = try!(tmp_file.path().to_str().ok_or(Error::InvalidTargetDir));
+
+    let (tx, rx) = channel();
+    let closed = Arc::new(Mutex::new(false));
+    let written = Arc::new(Mutex::new(false));
+
+    let mut watcher: RecommendedWatcher = try!(Watcher::new(tx));
+    {
+        let closed = closed.clone();
+        let written = written.clone();
+        let path = path.to_string();
+        thread::spawn(move || -> Result<()> {
+            try!(watcher.watch(path));
+            loop {
+                {
+                    let closed = closed.lock().unwrap();
+                    if *closed { return Ok(()) }
+                }
+                match rx.try_recv() {
+                    Err(TryRecvError::Disconnected) => { return Ok(()) },
+                    Err(TryRecvError::Empty) => {},
+                    Ok(notify::Event{op: Ok(notify::op::WRITE), ..}) => {
+                        let mut written = written.lock().unwrap();
+                        *written = true;
+                    },
+                    _ => {},
+                }
+            }
+        });
+    }
+    
+    let status = try!(Command::new(editor).arg(path).status());
+    {
+        let mut closed = closed.lock().unwrap();
+        *closed = true;
+    }
+
+    let written = written.lock().unwrap();
+    if !status.success() || !*written { return Ok(None); }
+    let mut tmp_file = try!(tmp_file.reopen());
     let _ = tmp_file.seek(SeekFrom::Start(0));
     let mut text = String::new();
     let _ = tmp_file.read_to_string(&mut text);
-    let json: CreateRequest = json::from_str(&*text).expect("Unable to parse repository parameters");
-
-    let api_url = "https://api.github.com/user/repos";
-
-    let mut client = match env::var("HTTP_PROXY") {
-        Ok(mut proxy) => {
-            let mut port = 80;
-            if let Some(colon) = proxy.rfind(':') {
-                port = proxy[colon + 1..].parse().expect("$HTTP_PROXY is invalid");
-                proxy.truncate(colon);
-            }
-            Client::with_http_proxy(proxy, port)
-        },
-        _ => Client::new()
-    };
-    
-    client.set_redirect_policy(RedirectPolicy::FollowAll);
-    let mut res = client
-        .post(&*api_url)
-        .header(Connection::close())
-        .header(Authorization(Basic { username: username.to_string(), password: Some(token.to_string()) }))
-        .header(UserAgent("create-gh-repo".into()))
-        .body(json::to_string(&json).unwrap().as_bytes())
-        .send().unwrap();
-   
-
-    let mut res_body = String::new();
-    let _ = res.read_to_string(&mut res_body);
-    println!("{}", res.status);
-    println!("{}", res_body);
-    if res.status == StatusCode::Created {
-        let res: CreateResponse = json::from_str(&*res_body).unwrap();
-        println!("{}", "Repository Created:");
-        println!("{}", res.clone_url);
-
-        let repo_path = match env::args().skip(1).next() {
-            Some(arg) => arg,
-            None => {
-                let url = Url::parse(&*res.clone_url).unwrap();
-                let target = match url.path_segments() {
-                    Some(segs) => segs.rev().next(),
-                    None => panic!("No repository name supplied"),
-                };
-
-                let target = match target {
-                    Some(target) if target != "" => target,
-                    _ => panic!("No repository name supplied"),
-                };
-
-                match Path::new(target).file_stem() {
-                    Some(target) => target.to_string_lossy().into_owned(),
-                    None => panic!("No repository name supplied"),
-                }
-            }
-        };
-        let repo_path = Path::new(&*repo_path);
-
-        if !repo_path.exists() ||
-            (repo_path.is_dir() &&
-            repo_path.read_dir().unwrap().count() == 0) {
-            match Repository::clone(&*res.clone_url, repo_path) {
-                Err(e) => panic!("Failed to clone repository: {}", e),
-                _ => println!("Repository cloned into: {}", repo_path.to_string_lossy()),
-            }
-        } else {
-            println!("Path: {}", repo_path.to_string_lossy());
-        }
-    }
+    Ok(Some(try!(json::from_str(&*text))))
 }
 
 fn template_text() -> String {

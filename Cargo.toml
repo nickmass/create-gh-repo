@@ -1,5 +1,5 @@
 [package]
-name = "create-gh-repo"
+name = "create_gh_repo"
 version = "0.1.0"
 authors = ["Nick Massey <nickmass@nickmass.com>"]
 
@@ -11,3 +11,7 @@ hyper = "0.9"
 tempfile = "2.1"
 git2 = "0.4"
 url = "1.2"
+clap = "2.10"
+log = "0.3"
+env_logger = "0.3"
+notify = "2.6"
