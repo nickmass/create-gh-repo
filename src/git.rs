@@ -1,6 +1,6 @@
 extern crate rpassword;
 
-use git2::{Repository, BranchType};
+use git2::{Config, Repository, BranchType};
 use error::{Error, Result};
 use url::Url;
 use std::path::Path;
@@ -13,6 +13,11 @@ pub enum GitMode {
     Remote,
     Push,
     Rebase,
+}
+
+pub fn get_config_value(key: &str) -> Result<String> {
+    let conf = try!(Config::open_default());
+    conf.get_string(key).map_err(|e| e.into())
 }
 
 pub fn clone(repo_url: &str, target_dir: Option<&str>) -> Result<String> {
