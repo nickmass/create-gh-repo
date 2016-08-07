@@ -22,8 +22,8 @@ impl HttpClient {
                     proxy.truncate(colon);
                 }
                 Client::with_http_proxy(proxy, port)
-            },
-            _ => Client::new()
+            }
+            _ => Client::new(),
         };
 
         client.set_redirect_policy(RedirectPolicy::FollowAll);
@@ -35,38 +35,42 @@ impl HttpClient {
     }
 
     pub fn with_basic_authorization<U, P>(&mut self, username: U, password: P) -> &mut Self
-        where U: Into<String>, P: Into<String>
+        where U: Into<String>,
+              P: Into<String>
     {
-        self.authorization = Some(Authorization(
-            Basic {username: username.into(), password: Some(password.into())}));
+        self.authorization = Some(Authorization(Basic {
+            username: username.into(),
+            password: Some(password.into()),
+        }));
         self
     }
 
     pub fn post_object<S, D>(self, url: &str, payload: &S) -> Result<D>
-        where S: serde::ser::Serialize, D: serde::de::Deserialize
+        where S: serde::ser::Serialize,
+              D: serde::de::Deserialize
     {
         let mut res = try!(if let Some(auth) = self.authorization {
-                self.client
+            self.client
                 .post(url)
                 .header(Connection::close())
                 .header(UserAgent("create-gh-repo".to_string()))
                 .header(auth)
-                .body(try!(json::to_string(payload)).as_bytes()).send()
-            } else {
-                self.client
+                .body(try!(json::to_string(payload)).as_bytes())
+                .send()
+        } else {
+            self.client
                 .post(url)
                 .header(Connection::close())
                 .header(UserAgent("create-gh-repo".to_string()))
-                .body(try!(json::to_string(payload)).as_bytes()).send()
-            });
+                .body(try!(json::to_string(payload)).as_bytes())
+                .send()
+        });
         let mut res_body = String::new();
         let _ = res.read_to_string(&mut res_body);
-        
+
         match json::from_str(&res_body) {
             Ok(r) => Ok(r),
-            Err(e) => Err(e.into())
+            Err(e) => Err(e.into()),
         }
     }
 }
-
-

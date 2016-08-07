@@ -115,4 +115,3 @@ impl From<tempfile::PersistError> for Error {
         Error::Tempfile(e)
     }
 }
-

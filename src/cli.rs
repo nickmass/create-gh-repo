@@ -5,44 +5,45 @@ use git::GitMode;
 use std::env;
 use clap::{Arg, ArgGroup, App};
 
-pub fn build_cli<'a>() -> App<'a,'a> {
+pub fn build_cli<'a>() -> App<'a, 'a> {
     App::new("Create GitHub Repositories")
         .version(crate_version!())
         .author(crate_authors!())
         .about("Allows you to create new repositories on GitHub from the command line")
         .arg(Arg::with_name("username")
-             .short("u")
-             .long("user")
-             .takes_value(true)
-             .help("Your GitHub account username"))
+            .short("u")
+            .long("user")
+            .takes_value(true)
+            .help("Your GitHub account username"))
         .arg(Arg::with_name("token")
-             .short("t")
-             .long("token")
-             .takes_value(true)
-             .conflicts_with("username")
-             .help("A Personal Token for your GitHub account with the 'public_repo' permission"))
+            .short("t")
+            .long("token")
+            .takes_value(true)
+            .conflicts_with("username")
+            .help("A Personal Token for your GitHub account with the 'public_repo' permission"))
         .arg(Arg::with_name("password")
-             .short("p")
-             .long("password")
-             .requires("username")
-             .takes_value(true)
-             .help("The password to your GitHub account"))
-        .group(ArgGroup::with_name("auth")
-               .args(&["token", "password"]))
+            .short("p")
+            .long("password")
+            .requires("username")
+            .takes_value(true)
+            .help("The password to your GitHub account"))
+        .group(ArgGroup::with_name("auth").args(&["token", "password"]))
         .arg(Arg::with_name("editor")
-             .short("e")
-             .long("editor")
-             .takes_value(true)
-             .help("The command to run to edit the repository manifest"))
+            .short("e")
+            .long("editor")
+            .takes_value(true)
+            .help("The command to run to edit the repository manifest"))
         .arg(Arg::with_name("directory")
-             .help("Sets an optional target directory for git operations")
-             .index(2))
+            .help("Sets an optional target directory for git operations")
+            .index(2))
         .arg(Arg::with_name("mode")
-             .index(1)
-             .possible_values(&["create", "clone", "remote", "push"])
-             .default_value("clone")
-             .required(true))
-        .after_help("NOTES:{n}<username>, <token>, and <password> may alternatively be supplied by setting the GITHUB_USERNAME, GITHUB_TOKEN, or GITHUB_PASSWORD environment variables")
+            .index(1)
+            .possible_values(&["create", "clone", "remote", "push"])
+            .default_value("clone")
+            .required(true))
+        .after_help("NOTES:{n}<username>, <token>, and <password> may alternatively be supplied \
+                     by setting the GITHUB_USERNAME, GITHUB_TOKEN, or GITHUB_PASSWORD environment \
+                     variables")
 }
 
 pub struct CommandOptions {
@@ -107,7 +108,7 @@ impl CommandOptionsBuilder {
         self
     }
 
-    pub fn directory<S>(&mut self, directory: S) -> &mut Self 
+    pub fn directory<S>(&mut self, directory: S) -> &mut Self
         where S: Into<String>
     {
         self.directory = Some(directory.into());
@@ -123,7 +124,9 @@ impl CommandOptionsBuilder {
         let auth = if self.token_auth {
             self.token
         } else if !self.token_auth && self.password.is_some() && self.username.is_some() {
-            Some(format!("{}:{}", self.username.as_ref().unwrap(), self.password.as_ref().unwrap()))
+            Some(format!("{}:{}",
+                         self.username.as_ref().unwrap(),
+                         self.password.as_ref().unwrap()))
         } else {
             None
         };
@@ -155,8 +158,8 @@ pub fn get_options() -> Result<CommandOptions> {
         _ => GitMode::Clone,
     };
 
-    let mut  builder = CommandOptionsBuilder::new();
-       
+    let mut builder = CommandOptionsBuilder::new();
+
     if let Some(editor) = matches.value_of("editor") {
         builder.editor(editor);
     }
@@ -175,4 +178,3 @@ pub fn get_options() -> Result<CommandOptions> {
     builder.mode(mode);
     builder.build()
 }
-

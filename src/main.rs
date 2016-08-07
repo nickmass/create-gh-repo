@@ -48,7 +48,7 @@ struct CreateRequest {
 
 impl Default for CreateRequest {
     fn default() -> CreateRequest {
-       CreateRequest {
+        CreateRequest {
             name: "".into(),
             description: "".into(),
             homepage: "".into(),
@@ -59,7 +59,7 @@ impl Default for CreateRequest {
             auto_init: true,
             gitignore_template: "".into(),
             license_template: "".into(),
-       }
+        }
     }
 }
 
@@ -81,8 +81,9 @@ fn main() {
         auto_init: options.mode != GitMode::Push,
         ..Default::default()
     };
-    let request_params = prompt_create_params(&options.editor, &default_params).map_err(error).unwrap();
- 
+    let request_params =
+        prompt_create_params(&options.editor, &default_params).map_err(error).unwrap();
+
     if request_params.is_none() {
         println!("Request parameters not saved, repository not created.");
         return;
@@ -90,36 +91,39 @@ fn main() {
 
     let request_params = request_params.unwrap();
 
-    //TODO: Need to handle errors from Github api
+    // TODO: Need to handle errors from Github api
     let api_url = "https://api.github.com/user/repos";
     let mut client = HttpClient::new();
     client.with_basic_authorization(options.auth, "");
     let res: CreateResponse = client.post_object(api_url, &request_params).map_err(error).unwrap();
- 
+
     println!("Repository Created: {}", res.clone_url);
     match options.mode {
-        GitMode::Create => {},
+        GitMode::Create => {}
         GitMode::Clone => {
             let repo_dir = git::clone(&res.clone_url, dir).map_err(error).unwrap();
             println!("Cloned into: {}", repo_dir);
-        },
-        GitMode::Remote => { 
+        }
+        GitMode::Remote => {
             let repo_dir = git::remotes(&res.clone_url, dir).map_err(error).unwrap();
             println!("Updated remotes for: {}", repo_dir);
-        },
-        GitMode::Push => { 
+        }
+        GitMode::Push => {
             let repo_dir = git::remotes(&res.clone_url, dir).map_err(error).unwrap();
             println!("Updated remotes for: {}", repo_dir);
             let repo_dir = git::push(dir, user, pass).map_err(error).unwrap();
             println!("Pushed repository: {}", repo_dir);
-        },
-        GitMode::Rebase => {unimplemented!();},
+        }
+        GitMode::Rebase => {
+            unimplemented!();
+        }
     }
 }
 
 #[allow(unreachable_code)]
-fn error<E>(err: E) -> E 
-    where E: std::error::Error {
+fn error<E>(err: E) -> E
+    where E: std::error::Error
+{
     error!("Error: {:?}", err);
     println!("Error: {}", err.description());
     std::process::exit(1);
@@ -148,21 +152,23 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
             loop {
                 {
                     let closed = closed.lock().unwrap();
-                    if *closed { return Ok(()) }
+                    if *closed {
+                        return Ok(());
+                    }
                 }
                 match rx.try_recv() {
-                    Err(TryRecvError::Disconnected) => { return Ok(()) },
-                    Err(TryRecvError::Empty) => {},
-                    Ok(notify::Event{op: Ok(notify::op::WRITE), ..}) => {
+                    Err(TryRecvError::Disconnected) => return Ok(()),
+                    Err(TryRecvError::Empty) => {}
+                    Ok(notify::Event { op: Ok(notify::op::WRITE), .. }) => {
                         let mut written = written.lock().unwrap();
                         *written = true;
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         });
     }
-    
+
     let status = try!(Command::new(editor).arg(&path).status());
     {
         let mut closed = closed.lock().unwrap();
@@ -170,7 +176,9 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
     }
 
     let written = written.lock().unwrap();
-    if !status.success() || !*written { return Ok(None); }
+    if !status.success() || !*written {
+        return Ok(None);
+    }
     let mut tmp_file = try!(File::open(&path));
     let mut text = String::new();
     let _ = tmp_file.read_to_string(&mut text);
