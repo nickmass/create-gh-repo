@@ -9,6 +9,8 @@ extern crate url;
 #[macro_use]
 extern crate clap;
 #[macro_use]
+extern crate nom;
+#[macro_use]
 extern crate log;
 extern crate env_logger;
 extern crate notify;
@@ -21,6 +23,7 @@ use http::HttpClient;
 mod git;
 use git::GitMode;
 
+use serde::Serialize;
 use std::thread;
 use std::sync::mpsc::{channel, TryRecvError};
 use std::sync::{Arc, Mutex};
@@ -67,6 +70,84 @@ impl Default for CreateRequest {
 struct CreateResponse {
     clone_url: String,
 }
+
+trait JsonTemplate
+    where Self: Sized
+{
+    fn to_template(&self) -> String;
+    fn from_template(&str) -> Result<Self>;
+}
+
+impl JsonTemplate for CreateRequest {
+    fn to_template(&self) -> String {
+        let mut buf = String::new();
+
+        fn wrap<T>(item: &T) -> String
+            where T: Serialize
+        {
+            json::to_string_pretty(item).unwrap()
+        }
+
+        buf.push_str(&*format!(r#"{{
+    //Required. The name of the repository
+    "name": {name},
+    //A short description of the repository
+    "description": {description},
+    //A URL with more information about the repository
+    "homepage": {homepage},
+    //Set to true to create a private repository
+    "private": {private},
+    //Set to true to enable issues for the repository
+    "has_issues": {has_issues},
+    //Set to true to enable the wiki for the repository
+    "has_wiki": {has_wiki},
+    //Set to true to enable downloads for the repository
+    "has_downloads": {has_downloads},
+    //Pass true to create an initial commit with empty README
+    "auto_init": {auto_init},
+    //Desired language or platform .gitignore template to apply. For example, "Haskell"
+    "gitignore_template": {gitignore_template},
+    //Desired LICENSE template to apply. For example, "mit" or "mozilla"
+    "license_template": {license_template}
+}}"#,
+                               name = wrap(&self.name),
+                               description = wrap(&self.description),
+                               homepage = wrap(&self.homepage),
+                               private = wrap(&self.private),
+                               has_issues = wrap(&self.has_issues),
+                               has_wiki = wrap(&self.has_wiki),
+                               has_downloads = wrap(&self.has_downloads),
+                               auto_init = wrap(&self.auto_init),
+                               gitignore_template = wrap(&self.gitignore_template),
+                               license_template = wrap(&self.license_template)));
+
+        buf
+    }
+
+    fn from_template(str: &str) -> Result<Self> {
+        use nom::rest_s;
+        named!(strip_comments<&str, String>, fold_many0!(alt!(chain!(
+                val: take_until_s!("//") ~
+                is_not_s!("\r\n")~
+                tag_s!("\r")?~
+                tag_s!("\n"),
+                || val) |
+                rest_s),
+            String::new(), |mut acc: String, item: &str| {
+                acc.push_str(item);
+                acc
+        }));
+        let result = strip_comments(str);
+
+        if !result.is_done() {
+            return Err(Error::Nom);
+        }
+
+
+        json::from_str(&*result.unwrap().1).map_err(|e| e.into())
+    }
+}
+
 
 fn main() {
     env_logger::init().map_err(error).unwrap();
@@ -132,7 +213,7 @@ fn error<E>(err: E) -> E
 
 fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<CreateRequest>> {
     let mut tmp_file = try!(NamedTempFile::new());
-    let _ = write!(tmp_file, "{}", template_text(options));
+    let _ = write!(tmp_file, "{}", options.to_template());
     let _ = tmp_file.sync_all();
     let path = try!(tmp_file.path().to_str().ok_or(Error::InvalidTargetDir)).to_string();
     {
@@ -183,10 +264,5 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
     let mut text = String::new();
     let _ = tmp_file.read_to_string(&mut text);
     try!(remove_file(&path));
-    Ok(Some(try!(json::from_str(&*text))))
-}
-
-fn template_text(req: &CreateRequest) -> String {
-    let json = json::to_string_pretty(req).unwrap();
-    json
+    Ok(Some(try!(CreateRequest::from_template(&*text))))
 }

@@ -53,7 +53,7 @@ impl HttpClient {
             self.client
                 .post(url)
                 .header(Connection::close())
-                .header(UserAgent("create-gh-repo".to_string()))
+                .header(UserAgent(format!("{}/{}", "create_gh_repo", crate_version!())))
                 .header(auth)
                 .body(try!(json::to_string(payload)).as_bytes())
                 .send()
@@ -61,7 +61,7 @@ impl HttpClient {
             self.client
                 .post(url)
                 .header(Connection::close())
-                .header(UserAgent("create-gh-repo".to_string()))
+                .header(UserAgent(format!("{}/{}", "create_gh_repo", crate_version!())))
                 .body(try!(json::to_string(payload)).as_bytes())
                 .send()
         });
