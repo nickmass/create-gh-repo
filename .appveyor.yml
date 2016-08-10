@@ -2,7 +2,8 @@ platform: x64
 install:
     - ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-nightly-x86_64-pc-windows-gnu.exe"
     - rust-nightly-x86_64-pc-windows-gnu.exe /VERYSILENT /NORESTART /DIR="C:\Program Files (x86)\Rust"
-    - set PATH=%PATH%;C:\Program Files (x86)\Rust\bin;C:\msys64\mingw64\bin;C:\msys64\usr\bin
+    - set MING_BIN_DIR=C:\msys64\mingw64\bin
+    - set PATH=%PATH%;C:\Program Files (x86)\Rust\bin;%MING_BIN_DIR%;C:\msys64\usr\bin
     - rustc -V
     - cargo -V
 build_script:
