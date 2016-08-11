@@ -236,6 +236,7 @@ mod tests {
         env::set_var("GITHUB_USERNAME", "user");
         env::set_var("GITHUB_PASSWORD", "pass");
         env::set_var("GITHUB_TOKEN", "token");
+        env::set_var("EDITOR", "vim");
 
         let opts = get_options(None).unwrap();
         assert_eq!(opts.username, Some("user".to_string()));
