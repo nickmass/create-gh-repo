@@ -62,7 +62,7 @@ pub struct CommandOptionsBuilder {
     token: Option<String>,
     directory: Option<String>,
     mode: Option<GitMode>,
-    token_auth: bool,
+    token_auth: Option<bool>,
 }
 
 impl CommandOptionsBuilder {
@@ -74,7 +74,7 @@ impl CommandOptionsBuilder {
             token: env::var("GITHUB_TOKEN").ok(),
             directory: None,
             mode: None,
-            token_auth: true,
+            token_auth: None,
         }
     }
 
@@ -96,7 +96,7 @@ impl CommandOptionsBuilder {
         where S: Into<String>
     {
         self.password = Some(password.into());
-        self.token_auth = false;
+        self.token_auth = Some(false);
         self
     }
 
@@ -104,7 +104,7 @@ impl CommandOptionsBuilder {
         where S: Into<String>
     {
         self.token = Some(token.into());
-        self.token_auth = true;
+        self.token_auth = Some(true);
         self
     }
 
@@ -121,14 +121,28 @@ impl CommandOptionsBuilder {
     }
 
     pub fn build(self) -> Result<CommandOptions> {
-        let auth = if self.token_auth {
-            self.token
-        } else if !self.token_auth && self.password.is_some() && self.username.is_some() {
-            Some(format!("{}:{}",
-                         self.username.as_ref().unwrap(),
-                         self.password.as_ref().unwrap()))
-        } else {
-            None
+        let auth = match self.token_auth {
+            None => {
+                if self.token.is_some() {
+                    self.token
+                } else if self.password.is_some() && self.username.is_some() {
+                    Some(format!("{}:{}",
+                                 self.username.as_ref().unwrap(),
+                                 self.password.as_ref().unwrap()))
+                } else {
+                    None
+                }
+            }
+            Some(true) => self.token,
+            Some(false) => {
+                if self.password.is_some() && self.username.is_some() {
+                    Some(format!("{}:{}",
+                                 self.username.as_ref().unwrap(),
+                                 self.password.as_ref().unwrap()))
+                } else {
+                    None
+                }
+            }
         };
 
         let auth = try!(auth.ok_or(Error::MissingParameter("authentication".into())));
@@ -146,8 +160,12 @@ impl CommandOptionsBuilder {
     }
 }
 
-pub fn get_options() -> Result<CommandOptions> {
-    let matches = build_cli().get_matches();
+pub fn get_options(args: Option<Vec<&str>>) -> Result<CommandOptions> {
+    let matches = if let Some(args) = args {
+        build_cli().get_matches_from(args)
+    } else {
+        build_cli().get_matches()
+    };
 
     let mode = match matches.value_of("mode") {
         Some("create") => GitMode::Create,
@@ -177,4 +195,88 @@ pub fn get_options() -> Result<CommandOptions> {
     }
     builder.mode(mode);
     builder.build()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    use git::GitMode;
+
+    #[test]
+    fn display_help() {
+        build_cli().print_help().unwrap();
+        println!("");
+    }
+
+    fn clear_vars() {
+        env::remove_var("EDITOR");
+        env::remove_var("GITHUB_USERNAME");
+        env::remove_var("GITHUB_PASSWORD");
+        env::remove_var("GITHUB_TOKEN");
+    }
+
+    #[test]
+    fn load_options_from_env() {
+        clear_vars();//TODO Inject env vars intp cli function
+        ::std::thread::sleep(::std::time::Duration::from_millis(1000));
+        // Very hacky, gets around parallel tests for now
+        env::set_var("GITHUB_USERNAME", "user");
+        env::set_var("GITHUB_PASSWORD", "pass");
+        env::set_var("EDITOR", "vim");
+
+        let opts = get_options(None).unwrap();
+        assert_eq!(opts.username, Some("user".to_string()));
+        assert_eq!(opts.password, Some("pass".to_string()));
+        assert_eq!(opts.auth, "user:pass".to_string());
+        assert_eq!(opts.mode, GitMode::Clone);
+
+        clear_vars();
+        env::set_var("GITHUB_USERNAME", "user");
+        env::set_var("GITHUB_PASSWORD", "pass");
+        env::set_var("GITHUB_TOKEN", "token");
+
+        let opts = get_options(None).unwrap();
+        assert_eq!(opts.username, Some("user".to_string()));
+        assert_eq!(opts.password, Some("pass".to_string()));
+        assert_eq!(opts.auth, "token".to_string());
+        assert_eq!(opts.mode, GitMode::Clone);
+    }
+
+    #[test]
+    fn set_options() {
+        clear_vars();
+        let opts = vec!["create_gh_repo", "-e=vim", "-p=pass", "-u=user", "create", "somedir"];
+        let opts = get_options(Some(opts)).unwrap();
+        assert_eq!(opts.username, Some("user".to_string()));
+        assert_eq!(opts.password, Some("pass".to_string()));
+        assert_eq!(opts.auth, "user:pass".to_string());
+        assert_eq!(opts.mode, GitMode::Create);
+        assert_eq!(opts.editor, "vim".to_string());
+        assert_eq!(opts.directory, Some("somedir".to_string()));
+
+        let opts = vec!["create_gh_repo",
+                        "--editor=vim",
+                        "--password=pass",
+                        "--user=user",
+                        "create",
+                        "somedir"];
+        let opts = get_options(Some(opts)).unwrap();
+        assert_eq!(opts.username, Some("user".to_string()));
+        assert_eq!(opts.password, Some("pass".to_string()));
+        assert_eq!(opts.auth, "user:pass".to_string());
+        assert_eq!(opts.mode, GitMode::Create);
+        assert_eq!(opts.editor, "vim".to_string());
+        assert_eq!(opts.directory, Some("somedir".to_string()));
+
+        let opts = vec!["create_gh_repo", "--editor=vim", "--token=token", "create", "somedir"];
+        let opts = get_options(Some(opts)).unwrap();
+        assert_eq!(opts.username, None);
+        assert_eq!(opts.password, None);
+        assert_eq!(opts.auth, "token".to_string());
+        assert_eq!(opts.mode, GitMode::Create);
+        assert_eq!(opts.editor, "vim".to_string());
+        assert_eq!(opts.directory, Some("somedir".to_string()));
+    }
 }

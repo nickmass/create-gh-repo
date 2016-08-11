@@ -6,7 +6,7 @@ use url::Url;
 use std::path::Path;
 use std::env;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum GitMode {
     Create,
     Clone,

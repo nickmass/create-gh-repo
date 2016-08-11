@@ -152,7 +152,7 @@ impl JsonTemplate for CreateRequest {
 fn main() {
     env_logger::init().map_err(error).unwrap();
 
-    let options = cli::get_options().map_err(error).unwrap();
+    let options = cli::get_options(None).map_err(error).unwrap();
     let dir = options.directory.as_ref().map(|x| &**x);
     let user = options.username.as_ref().map(|x| &**x);
     let pass = options.password.as_ref().map(|x| &**x);
