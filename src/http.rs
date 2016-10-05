@@ -70,7 +70,10 @@ impl HttpClient {
 
         match json::from_str(&res_body) {
             Ok(r) => Ok(r),
-            Err(e) => Err(e.into()),
+            Err(e) => {
+                error!("{}", res_body);
+                Err(e.into())
+            },
         }
     }
 }

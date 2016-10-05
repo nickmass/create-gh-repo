@@ -129,7 +129,7 @@ impl JsonTemplate for CreateRequest {
     fn from_template(str: &str) -> Result<Self> {
         use nom::rest_s;
         named!(strip_comments<&str, String>, fold_many0!(alt!(chain!(
-                val: take_until_s!("//") ~
+                val: take_until_s!(" //") ~
                 is_not_s!("\r\n")~
                 tag_s!("\r")?~
                 tag_s!("\n"),
