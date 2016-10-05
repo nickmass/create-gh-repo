@@ -22,7 +22,7 @@ pub fn get_config_value(key: &str) -> Result<String> {
 
 pub fn clone(repo_url: &str, target_dir: Option<&str>) -> Result<String> {
     let mut url = try!(Url::parse(repo_url));
-    let _ = try!(url.set_host(Some("localhost")));
+    try!(url.set_host(Some("localhost")));
     let repo_path = target_dir.map(|x| x.to_string()).or_else(|| {
         match url.to_file_path()
             .ok()
@@ -30,7 +30,7 @@ pub fn clone(repo_url: &str, target_dir: Option<&str>) -> Result<String> {
                 x.file_stem()
                     .map(|x| x.to_string_lossy().into_owned())
             }) {
-            Some(ref f) if f.len() > 0 => Some(f.clone()),
+            Some(ref f) if !f.is_empty() => Some(f.clone()),
             _ => None,
         }
     });
@@ -85,12 +85,12 @@ pub fn remotes(repo_url: &str, target_dir: Option<&str>) -> Result<String> {
     {
         let remote = repo.find_remote("origin").ok();
         let mut remote = if let Some(remote) = remote {
-            let _ = try!(repo.remote_set_url("origin", repo_url));
+            try!(repo.remote_set_url("origin", repo_url));
             remote
         } else {
             try!(repo.remote("origin", repo_url))
         };
-        let _ = try!(remote.fetch(&[], None, None));
+        try!(remote.fetch(&[], None, None));
     }
     let mut repo = repo;
     set_upstream(&mut repo, "master", "origin/master").ok();
@@ -115,14 +115,14 @@ pub fn push(target_dir: Option<&str>,
                 let _ = stdin().read_line(&mut buf);
                 buf
             } else {
-                username.unwrap().clone().to_string()
+                username.unwrap().to_owned()
             };
 
             let password = if password.is_none() {
                 println!("Password: ");
                 rpassword::read_password().unwrap()
             } else {
-                password.unwrap().clone().to_string()
+                password.unwrap().to_owned()
             };
             Cred::userpass_plaintext(username.trim(), &*password)
         });

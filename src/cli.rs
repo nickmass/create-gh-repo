@@ -68,7 +68,7 @@ pub struct CommandOptionsBuilder {
 impl CommandOptionsBuilder {
     pub fn new() -> CommandOptionsBuilder {
         CommandOptionsBuilder {
-            editor: git::get_config_value("core.editor").or(env::var("EDITOR")).ok(),
+            editor: git::get_config_value("core.editor").or_else(|_| env::var("EDITOR")).ok(),
             username: env::var("GITHUB_USERNAME").ok(),
             password: env::var("GITHUB_PASSWORD").ok(),
             token: env::var("GITHUB_TOKEN").ok(),

@@ -27,7 +27,8 @@ use git::GitMode;
 use serde::Serialize;
 use std::thread;
 use std::sync::mpsc::{channel, TryRecvError};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::process::Command;
 use std::io::{Write, Read};
 use std::fs::{remove_file, File};
@@ -221,8 +222,8 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
         let _ = try!(tmp_file.persist(&path));
     }
     let (tx, rx) = channel();
-    let closed = Arc::new(Mutex::new(false));
-    let written = Arc::new(Mutex::new(false));
+    let closed = Arc::new(AtomicBool::new(false));
+    let written = Arc::new(AtomicBool::new(false));
 
     let mut watcher: RecommendedWatcher = try!(Watcher::new(tx));
     {
@@ -232,18 +233,14 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
         thread::spawn(move || -> Result<()> {
             try!(watcher.watch(path));
             loop {
-                {
-                    let closed = closed.lock().unwrap();
-                    if *closed {
-                        return Ok(());
-                    }
+                if closed.load(Ordering::Relaxed) {
+                    return Ok(());
                 }
                 match rx.try_recv() {
                     Err(TryRecvError::Disconnected) => return Ok(()),
-                    Err(TryRecvError::Empty) => {}
+                    Err(TryRecvError::Empty) => { }
                     Ok(notify::Event { op: Ok(notify::op::WRITE), .. }) => {
-                        let mut written = written.lock().unwrap();
-                        *written = true;
+                        written.store(true, Ordering::Relaxed);
                     }
                     _ => {}
                 }
@@ -253,12 +250,10 @@ fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<
 
     let status = try!(Command::new(editor).arg(&path).status());
     {
-        let mut closed = closed.lock().unwrap();
-        *closed = true;
+        closed.store(true, Ordering::Relaxed);
     }
 
-    let written = written.lock().unwrap();
-    if !status.success() || !*written {
+    if !status.success() || !written.load(Ordering::Relaxed) {
         return Ok(None);
     }
     let mut tmp_file = try!(File::open(&path));
