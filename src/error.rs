@@ -1,7 +1,6 @@
 use std;
 use serde_json as json;
 use serde;
-use hyper;
 use url;
 use git2;
 use notify;
@@ -11,7 +10,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    Hyper(hyper::error::Error),
     Json(json::error::Error),
     Io(std::io::Error),
     Url(url::ParseError),
@@ -28,7 +26,6 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            Error::Hyper(ref e) => e.fmt(f),
             Error::Json(ref e) => e.fmt(f),
             Error::Io(ref e) => e.fmt(f),
             Error::Deserialize(ref e) => e.fmt(f),
@@ -47,7 +44,6 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::Hyper(ref e) => e.description(),
             Error::Json(ref e) => e.description(),
             Error::Io(ref e) => e.description(),
             Error::Deserialize(ref e) => e.description(),
@@ -64,7 +60,6 @@ impl std::error::Error for Error {
 
     fn cause(&self) -> Option<&std::error::Error> {
         match *self {
-            Error::Hyper(ref e) => Some(e),
             Error::Json(ref e) => Some(e),
             Error::Io(ref e) => Some(e),
             Error::Deserialize(ref e) => Some(e),
@@ -86,12 +81,6 @@ impl From<std::io::Error> for Error {
 impl From<json::error::Error> for Error {
     fn from(e: json::error::Error) -> Self {
         Error::Json(e)
-    }
-}
-
-impl From<hyper::error::Error> for Error {
-    fn from(e: hyper::error::Error) -> Self {
-        Error::Hyper(e)
     }
 }
 

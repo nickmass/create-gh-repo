@@ -3,7 +3,7 @@ extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
 extern crate tempfile;
-extern crate hyper;
+extern crate reqwest;
 extern crate git2;
 extern crate url;
 #[macro_use]
@@ -16,14 +16,19 @@ extern crate env_logger;
 extern crate notify;
 
 mod cli;
-mod error;
-use error::{Error, Result};
-mod http;
-use http::HttpClient;
 mod git;
-use git::GitMode;
+mod error;
 
+use git::GitMode;
+use error::{Error, Result};
+
+use reqwest::Client;
+use reqwest::header::{UserAgent, Authorization, Basic};
 use serde::Serialize;
+use serde_json as json;
+use tempfile::NamedTempFile;
+use notify::{Watcher, RecommendedWatcher};
+
 use std::thread;
 use std::sync::mpsc::{channel, TryRecvError};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -31,10 +36,6 @@ use std::sync::Arc;
 use std::process::Command;
 use std::io::{Write, Read};
 use std::fs::{remove_file, File};
-
-use tempfile::NamedTempFile;
-use serde_json as json;
-use notify::{Watcher, RecommendedWatcher};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct CreateRequest {
@@ -175,9 +176,20 @@ fn main() {
 
     // TODO: Need to handle errors from Github api
     let api_url = "https://api.github.com/user/repos";
-    let mut client = HttpClient::new();
-    client.with_basic_authorization(options.auth, "");
-    let res: CreateResponse = client.post_object(api_url, &request_params).map_err(error).unwrap();
+    let client = Client::new().unwrap();
+    let res: CreateResponse = client.post(api_url)
+        .header(Authorization(Basic{
+            username: options.auth,
+            password: None
+        }))
+        .header(UserAgent(format!("create-gh-repo/{}", crate_version!())))
+        .json(&request_params)
+        .send()
+        .map_err(error)
+        .unwrap()
+        .json()
+        .map_err(error)
+        .unwrap();
 
     println!("Repository Created: {}", res.clone_url);
     match options.mode {
