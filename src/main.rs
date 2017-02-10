@@ -1,4 +1,3 @@
-#![feature(rustc_macro)]
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
@@ -203,14 +202,12 @@ fn main() {
     }
 }
 
-#[allow(unreachable_code)]
-fn error<E>(err: E) -> E
+fn error<E>(err: E) -> !
     where E: std::error::Error
 {
     error!("Error: {:?}", err);
     println!("Error: {}", err.description());
-    std::process::exit(1);
-    err
+    std::process::exit(1)
 }
 
 fn prompt_create_params(editor: &str, options: &CreateRequest) -> Result<Option<CreateRequest>> {

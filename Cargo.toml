@@ -1,17 +1,17 @@
 [package]
-name = "create_gh_repo"
+name = "create-gh-repo"
 version = "0.1.2"
 authors = ["Nick Massey <nickmass@nickmass.com>"]
 
 [dependencies]
-serde = "0.8"
-serde_json = "0.8"
-serde_derive = "0.8"
+serde = "0.9"
+serde_json = "0.9"
+serde_derive = "0.9"
 hyper = "0.9"
 tempfile = "2.1"
 git2 = "0.4"
 url = "1.2"
-clap = "2.10"
+clap = "2.20"
 log = "0.3"
 env_logger = "0.3"
 notify = "2.6"

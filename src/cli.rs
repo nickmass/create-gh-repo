@@ -3,7 +3,7 @@ use git;
 use git::GitMode;
 
 use std::env;
-use clap::{Arg, ArgGroup, App};
+use clap::{Arg, ArgGroup, App, SubCommand, Shell};
 
 pub fn build_cli<'a>() -> App<'a, 'a> {
     App::new("Create GitHub Repositories")
@@ -40,7 +40,14 @@ pub fn build_cli<'a>() -> App<'a, 'a> {
             .index(1)
             .possible_values(&["create", "clone", "remote", "push"])
             .default_value("clone")
-            .required(true))
+            .required(true)
+            .help("Action taken after creating github repository"))
+        .subcommand(SubCommand::with_name("completions") 
+                    .arg(Arg::with_name("shell")
+                         .index(1)
+                         .possible_values(&["bash", "zsh", "fish", "powershell"])
+                         .required(true))
+                    .about("Generate completion scripts for your shell"))
         .after_help("NOTES:{n}<username>, <token>, and <password> may alternatively be supplied \
                      by setting the GITHUB_USERNAME, GITHUB_TOKEN, or GITHUB_PASSWORD environment \
                      variables")
@@ -166,6 +173,19 @@ pub fn get_options(args: Option<Vec<&str>>) -> Result<CommandOptions> {
     } else {
         build_cli().get_matches()
     };
+
+    if let Some(matches) = matches.subcommand_matches("completions") {
+        let shell = match matches.value_of("shell") {
+            Some("zsh") => Shell::Zsh,
+            Some("bash") => Shell::Bash,
+            Some("fish") => Shell::Fish,
+            Some("powershell") => Shell::PowerShell,
+            _ => Shell::Bash,
+        };
+
+        build_cli().gen_completions_to("create-gh-repo", shell, &mut ::std::io::stdout());
+        ::std::process::exit(1);
+    }
 
     let mode = match matches.value_of("mode") {
         Some("create") => GitMode::Create,
