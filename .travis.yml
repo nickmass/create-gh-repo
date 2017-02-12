@@ -13,7 +13,7 @@ script:
 before_deploy:
     - cargo build --release
     - cd target/release
-    - tar -zcvf create-gh-repo-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.tar.gz create_gh_repo
+    - tar -zcvf create-gh-repo-${TRAVIS_OS_NAME}-${TRAVIS_TAG}.tar.gz create-gh-repo
     - cd ../..
 deploy:
     provider: releases

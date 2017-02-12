@@ -16,7 +16,7 @@ after_build:
     - SET OPENSSL64_DIR=C:\OpenSSL-Win64\bin
     - IF %APPVEYOR_REPO_TAG% EQU true cargo build --release
     - IF %APPVEYOR_REPO_TAG% EQU true dir target\release
-    - IF %APPVEYOR_REPO_TAG% EQU true 7z a %RELEASE_ARCHIVE% %APPVEYOR_BUILD_FOLDER%\target\release\create_gh_repo.exe
+    - IF %APPVEYOR_REPO_TAG% EQU true 7z a %RELEASE_ARCHIVE% %APPVEYOR_BUILD_FOLDER%\target\release\create-gh-repo.exe
     - IF %APPVEYOR_REPO_TAG% EQU true 7z a %RELEASE_ARCHIVE% %MING_BIN_DIR%\zlib1.dll
     - IF %APPVEYOR_REPO_TAG% EQU true 7z a %RELEASE_ARCHIVE% %OPENSSL64_DIR%\ssleay32.dll
     - IF %APPVEYOR_REPO_TAG% EQU true 7z a %RELEASE_ARCHIVE% %OPENSSL64_DIR%\libeay32.dll
