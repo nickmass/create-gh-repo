@@ -58,6 +58,7 @@ pub struct CommandOptions {
     pub auth: String,
     pub username: Option<String>,
     pub password: Option<String>,
+    pub token: Option<String>,
     pub mode: GitMode,
     pub directory: Option<String>,
 }
@@ -131,7 +132,7 @@ impl CommandOptionsBuilder {
         let auth = match self.token_auth {
             None => {
                 if self.token.is_some() {
-                    self.token
+                    self.token.clone()
                 } else if self.password.is_some() && self.username.is_some() {
                     Some(format!("{}:{}",
                                  self.username.as_ref().unwrap(),
@@ -140,7 +141,7 @@ impl CommandOptionsBuilder {
                     None
                 }
             }
-            Some(true) => self.token,
+            Some(true) => self.token.clone(),
             Some(false) => {
                 if self.password.is_some() && self.username.is_some() {
                     Some(format!("{}:{}",
@@ -162,6 +163,7 @@ impl CommandOptionsBuilder {
             username: self.username,
             password: self.password,
             directory: self.directory,
+            token: self.token,
             mode: mode,
         })
     }

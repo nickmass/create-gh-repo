@@ -145,7 +145,6 @@ impl JsonTemplate for CreateRequest {
             return Err(Error::Nom);
         }
 
-
         json::from_str(&*result.unwrap().1).map_err(|e| e.into())
     }
 }
@@ -158,6 +157,7 @@ fn main() {
     let dir = options.directory.as_ref().map(|x| &**x);
     let user = options.username.as_ref().map(|x| &**x);
     let pass = options.password.as_ref().map(|x| &**x);
+    let token = options.token.as_ref().map(|x| &**x);
 
     let default_params = CreateRequest {
         name: git::get_repo_name(dir).unwrap_or("".into()),
@@ -205,7 +205,7 @@ fn main() {
         GitMode::Push => {
             let repo_dir = git::remotes(&res.clone_url, dir).map_err(error).unwrap();
             println!("Updated remotes for: {}", repo_dir);
-            let repo_dir = git::push(dir, user, pass).map_err(error).unwrap();
+            let repo_dir = git::push(dir, user, pass.or(token)).map_err(error).unwrap();
             println!("Pushed repository: {}", repo_dir);
         }
         GitMode::Rebase => {
